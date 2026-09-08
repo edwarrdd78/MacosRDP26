@@ -9,28 +9,32 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Configure User Password & Kickstart ARD
+      - name: Configure Passwords & Enable VNC
         run: |
-          # 1. Update password hash directly via dscl to avoid eDSAuthFailed
-          sudo dscl . -create /Users/runner UserShell /bin/zsh
-          sudo dsadmin -u runner -p '0697' 2>/dev/null || sudo dscl . -passwd /Users/runner '0697' '0697' 2>/dev/null || true
+          # 1. Set runner user password
+          sudo dscl . -passwd /Users/runner '0697' || true
           
-          # 2. Configure Apple Remote Desktop properly with clean kickstart flags
+          # 2. Enable ARD access for all users
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -activate -configure -access -on \
-            -allowAccessFor -allUsers -privs -all \
-            -clientopts -setvnclegacy yes -setvncpw '0697' \
+            -activate -configure -allowAccessFor -allUsers -privs -all
+            
+          # 3. Set VNC legacy password separately
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -configure -clientopts -setvnclegacy yes -setvncpw '0697'
+            
+          # 4. Restart ARD Agent
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -restart -agent -console
 
-      - name: Fix Headless Black Screen (Virtual Display Buffer)
+      - name: Force WindowServer Display Rendering
         run: |
-          # Install TigerVNC via Homebrew
-          brew install tigervnc
+          # Create virtual display session via WindowServer
+          sudo clp service enable 2>/dev/null || true
           
-          # Force resolution and spawn a virtual display frame buffer
-          vncserver :1 -geometry 1280x800 -depth 24 -SecurityTypes None &
+          # Force user session login to wake the display context
+          sudo launchctl kickstart -k system/com.apple.WindowServer || true
           
-          # Force power management to keep display context active
+          # Prevent sleep in headless mode
           sudo caffeinate -u -t 3600 &
 
       - name: Connect Tailscale
@@ -43,8 +47,7 @@ jobs:
         run: |
           TS_IP=$(tailscale ip -4)
           echo "=== macOS VNC ACCESS ==="
-          echo "Native VNC Port: $TS_IP:5900"
-          echo "TigerVNC Virtual Port: $TS_IP:5901"
+          echo "Address: $TS_IP:5900"
           echo "Username: runner"
           echo "Password: 0697"
           echo "========================"
