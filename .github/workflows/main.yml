@@ -9,16 +9,22 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Configure User Password & Enable VNC
+      - name: Set Password & Install VNC Server
         run: |
-          # Set 'runner' password to 0697 via dscl (bypasses Secure Token requirement)
+          # Set password for 'runner'
           sudo dscl . -passwd /Users/runner '0697' || true
           
-          # Force set legacy VNC password and allow all users access via ARD Kickstart
+          # Install lightweight VNC server that handles headless displays cleanly
+          brew install mac-vnc || brew install tightvnc || true
+
+          # Enable Apple Remote Desktop / VNC server with forced screen wake
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -configure -allowAccessFor -allUsers -privs -all \
             -configure -clientopts -setvnclegacy yes -setvncpw '0697' \
             -restart -agent
+
+          # Force display server to stay awake in headless mode
+          sudo caffeinate -u -t 3600 &
 
       - name: Connect Tailscale
         uses: tailscale/github-action@v4
@@ -30,8 +36,7 @@ jobs:
         run: |
           TS_IP=$(tailscale ip -4)
           echo "=== macOS VNC ACCESS ==="
-          echo "Connect via VNC (not RDP) in Remmina:"
-          echo "Address: $TS_IP:5900"
+          echo "VNC Address: $TS_IP:5900"
           echo "Username: runner"
           echo "Password: 0697"
           echo "========================"
