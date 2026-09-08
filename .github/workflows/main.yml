@@ -1,0 +1,42 @@
+name: macOS Remote Desktop
+
+on:
+  workflow_dispatch:
+
+jobs:
+  mac-desktop:
+    runs-on: macos-latest
+    timeout-minutes: 3600
+
+    steps:
+      - name: Set Runner Password & Enable VNC
+        run: |
+          # Set password for the default runner user to '12Eerrttyyuuii#'
+          echo "12Eerrttyyuuii#" | sudo passwd -stdin runner
+          
+          # Enable Apple Remote Desktop / VNC server
+          sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
+            -activate -configure -access -on \
+            -clientopts -setvnclegacy -vnclegacy yes \
+            -clientopts -setvncpw -vncpw '12Eerrttyyuuii#' \
+            -restart -agent -privs -all
+
+      - name: Connect Tailscale
+        uses: tailscale/github-action@v4
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTH_KEY }}
+          hostname: gh-mac-${{ github.run_id }}
+
+      - name: Fetch Tailscale IP & Keep Alive
+        run: |
+          TS_IP=$(tailscale ip -4)
+          echo "=== macOS VNC ACCESS ==="
+          echo "VNC URL: vnc://$TS_IP:5900"
+          echo "Username: runner"
+          echo "Password: 12Eerrttyyuuii#"
+          echo "========================"
+          
+          while true; do
+            echo "[$(date)] macOS VNC Runner Active..."
+            sleep 300
+          done
