@@ -9,16 +9,19 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Set Runner Password & Enable VNC
+      - name: Configure Root & User Passwords + Enable VNC
         run: |
-          # Set password for the default runner user to '12Eerrttyyuuii#'
-          echo "12Eerrttyyuuii#" | sudo passwd -stdin runner
+          # Set password for default 'runner' user to '0697'
+          sudo dscl . -passwd /Users/runner '0697'
           
-          # Enable Apple Remote Desktop / VNC server
+          # Enable and set password for 'root' user to '0697'
+          sudo dscl . -passwd /Users/root '0697'
+          
+          # Enable Apple Remote Desktop / VNC server with legacy VNC password '0697'
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
             -activate -configure -access -on \
             -clientopts -setvnclegacy -vnclegacy yes \
-            -clientopts -setvncpw -vncpw '12Eerrttyyuuii#' \
+            -clientopts -setvncpw -vncpw '0697' \
             -restart -agent -privs -all
 
       - name: Connect Tailscale
@@ -32,8 +35,8 @@ jobs:
           TS_IP=$(tailscale ip -4)
           echo "=== macOS VNC ACCESS ==="
           echo "VNC URL: vnc://$TS_IP:5900"
-          echo "Username: runner"
-          echo "Password: 12Eerrttyyuuii#"
+          echo "Username: runner (or root)"
+          echo "Password: 0697"
           echo "========================"
           
           while true; do
