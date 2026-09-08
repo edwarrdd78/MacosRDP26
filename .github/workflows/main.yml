@@ -9,21 +9,16 @@ jobs:
     timeout-minutes: 3600
 
     steps:
-      - name: Configure Passwords & Enable VNC
+      - name: Configure User Password & Enable VNC
         run: |
-          # Change password for 'runner' using sysadminctl (resets password directly)
-          sudo sysadminctl -resetPasswordFor runner -newPassword '0697'
+          # Set 'runner' password to 0697 via dscl (bypasses Secure Token requirement)
+          sudo dscl . -passwd /Users/runner '0697' || true
           
-          # Enable and set password for 'root'
-          sudo dscl . -create /Users/root UserShell /bin/zsh
-          sudo sysadminctl -resetPasswordFor root -newPassword '0697'
-          
-          # Enable Apple Remote Desktop / VNC server with password '0697'
+          # Force set legacy VNC password and allow all users access via ARD Kickstart
           sudo /System/Library/CoreServices/RemoteManagement/ARDAgent.app/Contents/Resources/kickstart \
-            -activate -configure -access -on \
-            -clientopts -setvnclegacy -vnclegacy yes \
-            -clientopts -setvncpw -vncpw '0697' \
-            -restart -agent -privs -all
+            -configure -allowAccessFor -allUsers -privs -all \
+            -configure -clientopts -setvnclegacy yes -setvncpw '0697' \
+            -restart -agent
 
       - name: Connect Tailscale
         uses: tailscale/github-action@v4
@@ -35,7 +30,8 @@ jobs:
         run: |
           TS_IP=$(tailscale ip -4)
           echo "=== macOS VNC ACCESS ==="
-          echo "VNC URL: vnc://$TS_IP:5900"
+          echo "Connect via VNC (not RDP) in Remmina:"
+          echo "Address: $TS_IP:5900"
           echo "Username: runner"
           echo "Password: 0697"
           echo "========================"
